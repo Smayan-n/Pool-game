@@ -229,6 +229,7 @@ class Ball():
 class Cue():
     def __init__(self):
 
+        #max force
         self.maxForce = 18000
         self.force = 0 
         self.dist = 0
