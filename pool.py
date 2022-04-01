@@ -230,7 +230,7 @@ class Cue():
     def __init__(self):
 
         self.maxForce = 18000
-        self.force = 0
+        self.force = 0 
         self.dist = 0
         self.rise = 0
         self.run = 0
