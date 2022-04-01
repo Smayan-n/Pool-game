@@ -587,6 +587,7 @@ bg_color = (200, 200, 200)
 
 
 #bounce_sound = pygame.mixer.Sound('assets/bounce_sound.wav')
+#this is so cool
 
 if __name__ == '__main__':
    main()
