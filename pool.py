@@ -4,8 +4,6 @@ import math
 import pygame, sys
 from pymunk.pygame_util import DrawOptions
 import pymunk
-import numpy
-
 pygame.init()
 
 
@@ -38,16 +36,13 @@ class Border():
 #class for all pool balls and pockets
 class Ball():
 
-    def __init__(self, pos, color, ballNum, vel = (0, 0)):
+    def __init__(self, pos, color, ballNum, vel = (0, 0), radius = 11):
 
         #ball color
         self.color = color
 
         #friction value that affects all the balls
         self.friction = 0.1
-        
-        self.maxVel_x = 0
-        self.maxVel_y = 0
 
         #stores ball num(cue ball(0), 8 ball(8), etc)
         self.ballNum = ballNum
@@ -67,7 +62,7 @@ class Ball():
              
         
         #putting the body in a shape          radius
-        self.shape = pymunk.Circle(self.body, 10)
+        self.shape = pymunk.Circle(self.body, radius)
         self.shape.elasticity = 0.8
         self.shape.collision_type = ballNum
 
@@ -76,7 +71,7 @@ class Ball():
 
     
     #makes pymunk shape visible. Draws balls as circles
-    def draw(self, isOverride = False, pos_x = 0, pos_y = 0, radius = 10):
+    def draw(self, isOverride = False, pos_x = 0, pos_y = 0, radius = 11):
         #override and other parammeters used to display the balls remaining below the table
 
         #getting x and y position of the balls
@@ -99,46 +94,53 @@ class Ball():
     #applys friction to all moving balls so that they do not infinitely move
     def applyFriction(self):
 
-        #collision handling
-        for i, handler in enumerate(ball_border_handlers):
-            
-            handler.separate = balls[i].collide
+        vel_x, vel_y = self.body.velocity[0], self.body.velocity[1]
         
+        #keeping the signs of the x and y velocities so they can be re-applied afterwards
+        if vel_x  == 0: vel_x = 0.1
+        if vel_y == 0: vel_y = 0.1
+
+        x_sign = vel_x/abs(vel_x)
+        y_sign = vel_y/abs(vel_y)
+
+        #calculating angle of trinagle
+        angle = 0
+        if vel_x != 0:
+            angle = math.atan(vel_y/vel_x)
+
+        #the hypotenuse of the triangle(total velocity) 
+        vel = math.sqrt(vel_x**2 + vel_y**2)
+
+        #applying friction on the total velocity
+        if vel != 0:
+            vel -= self.friction
+
+        #setting vel to 0 when its close to 0: so that it does not go on infinitely
+        if -self.friction <= vel <= self.friction:
+            vel = 0
+
+        #calculating the new x and y components of the velocity
+        vel_x = abs(vel * math.cos(angle)) * x_sign
+        vel_y = abs(vel * math.sin(angle)) * y_sign
+
+        #setting the new velocity
+        self.body.velocity = (vel_x, vel_y)     
+
+
+    #NOT USED
+    #calculates the x and y componet of friction
+    def calculateComponents(self, rise, run):
+
+        slope = 0
+        if run != 0:
+            slope = rise/run
         
-        vel_x = self.body.velocity[0]
-        vel_y = self.body.velocity[1]
+        angle = math.atan(slope)
+        xComp = 0.15*math.cos(math.radians(angle))
+        yComp = 0.15*math.sin(math.radians(angle))
+        #print(f"angle: {angle}, horizontal: {xComp}, vertical : {yComp}")
 
-        friction_x = self.friction
-        friction_y = self.friction 
-
-
-        #reducing or increasing each ball's speed to slow it down (friction)
-        if(vel_x > 0):
-            vel_x -= friction_x
-        elif(vel_x < 0):
-            vel_x += friction_x
-        
-        #to make sure balls come to rest
-        if(vel_x < self.friction and vel_x > self.friction*-1):
-            vel_x = 0
-
-
-        if(vel_y > 0):
-            vel_y -= friction_y
-        elif(vel_y < 0):
-            vel_y += friction_y
-
-        #to make sure balls come to rest
-        if(vel_y < self.friction and vel_y > self.friction*-1):
-            vel_y = 0
-
-        #setting vel to balls after calculation
-        self.body.velocity = (vel_x, vel_y)
-
-        #if self.ballNum == 0:
-            #print(vel_x, vel_y)
-
-
+        return (xComp, yComp)
 
     #checks if any balls go in the pockets
     def checkPut(self):
@@ -206,11 +208,15 @@ class Ball():
         if self.body.position.x + self.shape.radius> table_width / 4 + 20:
             self.body.position = (table_width / 4 + 20 - self.shape.radius, self.body.position.y)
 
-    #collision - not being used currently
+    #NOT USED
+    #ball and border collision
     def collide(self, arbiter, space, body):
         print("collide:", self.ballNum)
-        return True
-        #bounce_sound.play()
+
+        xComp, yComp = self.calculateComponents(self.body.velocity.x, self.body.velocity.y)
+        print(xComp, yComp)
+        self.friction_x = xComp
+        self.friction_y = yComp
         
 
     #static method that returns true if all any balls are moving
@@ -291,20 +297,7 @@ class Cue():
         
         #using distance of cue to determine the force
         #doing it here because the power bar needs force to be constantly updated
-        self.force = int(self.dist) * 60 #const
-
-    def calculateComponents(self):
-
-        slope = 0
-        if self.run != 0:
-            slope = self.rise/self.run
-        
-        angle = (math.atan(slope) * (180/math.pi))
-        xComp = 0.15*math.cos(angle * (math.pi/180))
-        yComp = 0.15*math.sin(angle * (math.pi/180))
-        #print(f"angle: {angle}, horizontal: {xComp}, vertical : {yComp}")
-
-        return (xComp, yComp)
+        self.force = int(self.dist) * 60 
     
 
     #for calculating the power and direction cue ball will go after release
@@ -334,7 +327,6 @@ class Cue():
 
 
         #applying force to cue ball
-        
         balls[0].body.apply_force_at_local_point((force_x, force_y), (0, 0))
        
 
