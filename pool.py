@@ -1,9 +1,10 @@
 #using pymunk (for physics) and pygame for display
 
 import math
+from re import X
 import pygame, sys
 from pymunk.pygame_util import DrawOptions
-import pymunk
+import pymunk, numpy
 pygame.init()
 
 
@@ -30,7 +31,8 @@ class Border():
 
         pygame.draw.line(screen, (255, 255, 0) , self.p1, self.p2, newDepth)
 
-        
+    def getValues(self):
+        return self.p1, self.p2, self.depth
 
 
 #class for all pool balls and pockets
@@ -40,6 +42,8 @@ class Ball():
 
         #ball color
         self.color = color
+
+        self.radius = radius
 
         #friction value that affects all the balls
         self.friction = 0.1
@@ -62,7 +66,7 @@ class Ball():
              
         
         #putting the body in a shape          radius
-        self.shape = pymunk.Circle(self.body, radius)
+        self.shape = pymunk.Circle(self.body, self.radius)
         self.shape.elasticity = 0.8
         self.shape.collision_type = ballNum
 
@@ -76,7 +80,7 @@ class Ball():
 
         #getting x and y position of the balls
         if not isOverride:
-            pos_x, pos_y= self.body.position
+            pos_x, pos_y = self.body.position
              
 
         #drawing a circle with position     
@@ -94,7 +98,7 @@ class Ball():
     #applys friction to all moving balls so that they do not infinitely move
     def applyFriction(self):
 
-        vel_x, vel_y = self.body.velocity[0], self.body.velocity[1]
+        vel_x, vel_y = self.body.velocity
         
         #keeping the signs of the x and y velocities so they can be re-applied afterwards
         if vel_x  == 0: vel_x = 0.1
@@ -127,21 +131,6 @@ class Ball():
         self.body.velocity = (vel_x, vel_y)     
 
 
-    #NOT USED
-    #calculates the x and y componet of friction
-    def calculateComponents(self, rise, run):
-
-        slope = 0
-        if run != 0:
-            slope = rise/run
-        
-        angle = math.atan(slope)
-        xComp = 0.15*math.cos(math.radians(angle))
-        yComp = 0.15*math.sin(math.radians(angle))
-        #print(f"angle: {angle}, horizontal: {xComp}, vertical : {yComp}")
-
-        return (xComp, yComp)
-
     #checks if any balls go in the pockets
     def checkPut(self):
         global balls_remaining
@@ -154,6 +143,11 @@ class Ball():
 
             #if ball potted is cue ball then it should not be deleted
             if self.ballNum == 0:
+
+                #if cue ball is potted then the other balls should stop moving
+                for ball in balls:
+                    ball.body.velocity = (0, 0)
+
                 #resetting cue ball pos and vel
                 self.body.position = (table_width / 4, table_height / 2)
                 self.body.velocity = (0, 0)
@@ -163,12 +157,9 @@ class Ball():
                 screen.blit(msg, (table_width / 2 - (msg.get_width() / 2), table_height / 2 - (msg.get_height() / 2)))
                 pygame.display.update()
 
-                #to play death message for longer
-                i = 0
-                while i < 100:
-                    pygame.time.delay(10)
-                    i += 1
-                    
+                #to play message for longer
+                pygame.time.delay(800)
+
                 return
 
 
@@ -212,20 +203,18 @@ class Ball():
     #ball and border collision
     def collide(self, arbiter, space, body):
         print("collide:", self.ballNum)
-
-        xComp, yComp = self.calculateComponents(self.body.velocity.x, self.body.velocity.y)
-        print(xComp, yComp)
-        self.friction_x = xComp
-        self.friction_y = yComp
         
 
     #static method that returns true if all any balls are moving
     @staticmethod
     def areMoving():
         #TODO
-        for ball in balls:
-            
-            if ball.body.velocity[0] != 0.0 or ball.body.velocity[1] != 0.0:
+        
+        for ball in balls:  
+            vel_x, vel_y = ball.body.velocity
+
+            #there is some head room (vel does not have to be exactly 0)
+            if vel_x < -0.2 or vel_x > 0.2 or vel_y < -0.2 or vel_y > 0.2:
                 return True
             
         return False
@@ -238,18 +227,17 @@ class Cue():
         #max force
         self.maxForce = 18000
         self.force = 0 
-        self.dist = 0
         self.rise = 0
         self.run = 0
 
     #drawing the cue and the calculations
     def draw(self):
-        
+
         #cue ball position
         cueBall_x, cueBall_y  = balls[0].body.position
        
 	
-	#mouse pos
+	    #mouse pos
         end_x, end_y = pygame.mouse.get_pos()
 
         #drawing the cue stick from center of cue ball to cursr position
@@ -257,48 +245,63 @@ class Cue():
 
 
         #calculating distance for other func
-        self.dist = int(math.sqrt((end_y - cueBall_y)**2 + (end_x - cueBall_x)**2))
+        dist = int(math.sqrt((end_y - cueBall_y)**2 + (end_x - cueBall_x)**2))
         
 
-        #drawing guide lines
+        #drawing the guide line
 
         #partial slope (the signs are opposite)
         self.rise = (end_y - cueBall_y)
         self.run = (end_x - cueBall_x)
         
-
-        #guide line same length as cue length
-
-        #to calculate coords for opp end point, subtract slope from cue ball pos
-        #end_x_gl = cueBall_x - self.run
-        #end_y_gl = cueBall_y - self.rise
-
-
         #constant length guide line
 
         #calculating the hypotenuese of the triangle fromed by cue
         hyp = math.sqrt(self.run**2 + self.rise**2)
-        if hyp == 0:
-            hyp = 1
+        if hyp == 0: hyp = 1
+        
+        #guide line length
         gl_length = 250
 
         #using ratios and proportion to calculate each x and y value opposite to cue
         #ex: run = 3, rise = 4, THEN hyp = 5 we know that the x,y coord is (3,4)
         #now we find x,y coord when hyp is gl_length (lets say 100):
-        #   5 : 3 (run)    5 : 4 (rise)
-        # 100 : x (run)  100 : y (run) ----> solve for x and y
+        #   5 : 3 (run)  |  5 : 4 (rise)
+        # 100 : x (run)  |  100 : y (run) ----> solve for x and y
         # (x,y) will be new relative point - subtract from cue_ball pos to get accurate plottable point
 
         end_x_gl = cueBall_x - (gl_length * self.run) / hyp
         end_y_gl = cueBall_y - (gl_length * self.rise) / hyp
+
+        self.guideLine(cueBall_x, cueBall_y)
         
         pygame.draw.line(screen, (255, 255, 255), (cueBall_x, cueBall_y), (end_x_gl, end_y_gl), 2)
-
         
         #using distance of cue to determine the force
         #doing it here because the power bar needs force to be constantly updated
-        self.force = int(self.dist) * 60 
+        self.force = int(dist) * 60 
     
+
+    def guideLine(self, cueBall_x, cueBall_y):
+
+        rise, run = -self.rise, -self.run
+
+        l_slope = 0
+        if run != 0: l_slope = rise / run
+
+        # y = mx + b
+        #l_y = l_slope*l_x + cueBall_y
+
+
+        for border in borders:
+            p1, p2, depth = border.getValues()
+
+            for x in range(int(p1[0]), int(p2[0])):
+                temp = l_slope*x + cueBall_y
+                if temp == 0:
+                    print("done", (x, temp))
+            
+
 
     #for calculating the power and direction cue ball will go after release
     def release(self):
@@ -307,10 +310,8 @@ class Cue():
         moves += 1
         
         #inverting rise and run
-        rise = self.rise * -1
-        run = self.run * -1
+        rise, run = -self.rise, -self.run
         rise_run_sum = abs(rise) + abs(run)
-
 
         #limiting max force
         if self.force > self.maxForce:
@@ -453,7 +454,7 @@ def displayGraphics():
     #power bar
 
     #label
-    pwr_lbl = font1.render("POWER" , 5, (255, 138, 0))
+    pwr_lbl = font1.render("POWER" , 5, orange)
     screen.blit(pwr_lbl, (width - 48, 5))
 
     #background rect
@@ -544,8 +545,6 @@ def main():
 
                 initGameObjects()                    
 
-
-
         #calling graphics methods
         displayGraphics() 
        
@@ -577,9 +576,7 @@ orange = (230, 126, 33)
 
 bg_color = (200, 200, 200)
 
-
 #bounce_sound = pygame.mixer.Sound('assets/bounce_sound.wav')
-#this is so cool
 
 if __name__ == '__main__':
    main()
@@ -591,4 +588,4 @@ if __name__ == '__main__':
 
 
 
-   
+
