@@ -1,10 +1,9 @@
 #using pymunk (for physics) and pygame for display
 
 import math
-from re import X
 import pygame, sys
 from pymunk.pygame_util import DrawOptions
-import pymunk, numpy
+import pymunk
 pygame.init()
 
 
