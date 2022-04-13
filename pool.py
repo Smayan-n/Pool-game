@@ -7,7 +7,8 @@ import pymunk
 pygame.init()
 
 
-#to create border aroud the pool table
+#to create a border around the pool table
+#uses 4 pymunk segments to do so
 class Border():
     def __init__(self, p1, p2, d):
 
@@ -39,32 +40,24 @@ class Ball():
 
     def __init__(self, pos, color, ballNum, vel = (0, 0), radius = 11):
 
-        #ball color
         self.color = color
-
         self.radius = radius
-
-        #friction value that affects all the balls
         self.friction = 0.1
 
         #stores ball num(cue ball(0), 8 ball(8), etc)
         self.ballNum = ballNum
-
         self.cueBall_move = False
 
         #list of all pockets' coordinates
         #self.pockets = [(30, 25), (400, 25), (775, 25), (30, 425), (400, 425), (775, 425)]
 
-
         #-----------------creating the pymunk object-------------------------------------
-
         #                       mass, inertia,      body type: static, dynamic, or kinetic
         self.body = pymunk.Body(1, 100, body_type = pymunk.Body.DYNAMIC)
         self.body.position = pos  
-        self.body.velocity = vel
-             
+        self.body.velocity = vel      
         
-        #putting the body in a shape          radius
+        #putting the body in a shape
         self.shape = pymunk.Circle(self.body, self.radius)
         self.shape.elasticity = 0.8
         self.shape.collision_type = ballNum
@@ -72,15 +65,12 @@ class Ball():
         #adding shape to pymunk space
         space.add(self.body, self.shape)
 
-    
     #makes pymunk shape visible. Draws balls as circles
     def draw(self, isOverride = False, pos_x = 0, pos_y = 0, radius = 11):
         #override and other parammeters used to display the balls remaining below the table
-
         #getting x and y position of the balls
         if not isOverride:
-            pos_x, pos_y = self.body.position
-             
+            pos_x, pos_y = self.body.position 
 
         #drawing a circle with position     
         pygame.draw.circle(screen, self.color, (pos_x, pos_y), radius)
@@ -92,7 +82,6 @@ class Ball():
 
         ballNum = font1.render(str(self.ballNum), 5, text_color)
         screen.blit(ballNum, (pos_x - ballNum.get_width() / 2, pos_y - ballNum.get_height() / 2))
-
 
     #applys friction to all moving balls so that they do not infinitely move
     def applyFriction(self):
@@ -129,20 +118,16 @@ class Ball():
         #setting the new velocity
         self.body.velocity = (vel_x, vel_y)     
 
-
     #checks if any balls go in the pockets
     def checkPut(self):
         global balls_remaining
 
         #only uses the y pos of ball and pocket to determine score
         pos_y = self.body.position.y
-
         
         if (pos_y < 23 or pos_y > 427):
-
             #if ball potted is cue ball then it should not be deleted
             if self.ballNum == 0:
-
                 #if cue ball is potted then the other balls should stop moving
                 for ball in balls:
                     ball.body.velocity = (0, 0)
@@ -159,27 +144,21 @@ class Ball():
                 #to play message for longer
                 pygame.time.delay(800)
 
+                
+            else:
+                #deleting ball 
+                pymunk.Space.remove(space, self.body)
+                pymunk.Space.remove(space, self.shape)
+                balls.remove(self)
+                balls_remaining -= 1
+                #exiting func so no errors are produced
                 return
 
-
-            #deleting ball
-            pymunk.Space.remove(space, self.body)
-            pymunk.Space.remove(space, self.shape)
-            balls.remove(self)
-
-            balls_remaining -= 1
-
-            #exiting func so no errors are produced
-            return
-
-
     def moveCueBall(self, event):
-
         mouse_pos = pygame.mouse.get_pos()
         #cue ball position and radius
         ball_pos = (self.body.position.x, self.body.position.y)
         radius = self.shape.radius
-
 
         #checks if player is clicking on the cue ball, then allowing him to move it
         if mouse_pos[0] > ball_pos[0] - radius and mouse_pos[0] < ball_pos[0] + radius:
@@ -201,73 +180,63 @@ class Ball():
     #NOT USED
     #ball and border collision
     def collide(self, arbiter, space, body):
-        print("collide:", self.ballNum)
-        
+        print("collide:", self.ballNum)  
 
     #static method that returns true if all any balls are moving
     @staticmethod
     def areMoving():
-        #TODO
         
         for ball in balls:  
             vel_x, vel_y = ball.body.velocity
-
             #there is some head room (vel does not have to be exactly 0)
             if vel_x < -0.2 or vel_x > 0.2 or vel_y < -0.2 or vel_y > 0.2:
-                return True
-            
+                return True         
         return False
 
 
 #cue class
 class Cue():
     def __init__(self):
-
         #max force
         self.maxForce = 18000
+
         self.force = 0 
         self.rise = 0
         self.run = 0
 
     #drawing the cue and the calculations
     def draw(self):
-
         #cue ball position
-        cueBall_x, cueBall_y  = balls[0].body.position
-       
+        cueBall_x, cueBall_y  = balls[0].body.position 
 	
-	    #mouse pos
+	    #mouse position
         end_x, end_y = pygame.mouse.get_pos()
 
         #drawing the cue stick from center of cue ball to cursr position
         pygame.draw.line(screen, (204, 102, 0), (cueBall_x, cueBall_y), (end_x, end_y), 5)
 
-
-        #calculating distance for other func
-        dist = int(math.sqrt((end_y - cueBall_y)**2 + (end_x - cueBall_x)**2))
-        
-
-        #drawing the guide line
-
-        #partial slope (the signs are opposite)
-        self.rise = (end_y - cueBall_y)
-        self.run = (end_x - cueBall_x)
-        
-        #constant length guide line
-
-        #calculating the hypotenuese of the triangle fromed by cue
-        hyp = math.sqrt(self.run**2 + self.rise**2)
-        if hyp == 0: hyp = 1
-        
-        #guide line length
-        gl_length = 250
-
+        #-----------------------------------------------------------------------------------------
+        #drawing the guide line of a costant length. METHOD:
         #using ratios and proportion to calculate each x and y value opposite to cue
         #ex: run = 3, rise = 4, THEN hyp = 5 we know that the x,y coord is (3,4)
         #now we find x,y coord when hyp is gl_length (lets say 100):
         #   5 : 3 (run)  |  5 : 4 (rise)
         # 100 : x (run)  |  100 : y (run) ----> solve for x and y
         # (x,y) will be new relative point - subtract from cue_ball pos to get accurate plottable point
+
+        #distance of cue
+        dist = int(math.sqrt((end_y - cueBall_y)**2 + (end_x - cueBall_x)**2))
+
+        #partial slope (the signs are opposite)
+        self.rise = (end_y - cueBall_y)
+        self.run = (end_x - cueBall_x)
+        
+        #calculating the hypotenuese of the triangle fromed by cue
+        hyp = math.sqrt(self.run**2 + self.rise**2)
+        if hyp == 0: hyp = 1
+        
+        #guide line length
+        gl_length = 250
 
         end_x_gl = cueBall_x - (gl_length * self.run) / hyp
         end_y_gl = cueBall_y - (gl_length * self.rise) / hyp
@@ -276,10 +245,10 @@ class Cue():
         
         pygame.draw.line(screen, (255, 255, 255), (cueBall_x, cueBall_y), (end_x_gl, end_y_gl), 2)
         
+
         #using distance of cue to determine the force
         #doing it here because the power bar needs force to be constantly updated
-        self.force = int(dist) * 60 
-    
+        self.force = int(dist) * 60   
 
     def guideLine(self, cueBall_x, cueBall_y):
 
@@ -290,17 +259,6 @@ class Cue():
 
         # y = mx + b
         #l_y = l_slope*l_x + cueBall_y
-
-
-        for border in borders:
-            p1, p2, depth = border.getValues()
-
-            for x in range(int(p1[0]), int(p2[0])):
-                temp = l_slope*x + cueBall_y
-                if temp == 0:
-                    print("done", (x, temp))
-            
-
 
     #for calculating the power and direction cue ball will go after release
     def release(self):
@@ -325,10 +283,8 @@ class Cue():
             force_x = (run / rise_run_sum) * self.force
             force_y = (rise / rise_run_sum) * self.force
 
-
         #applying force to cue ball
         balls[0].body.apply_force_at_local_point((force_x, force_y), (0, 0))
-       
 
 
 #creates objects like the borders and balls and acts as reset func
@@ -340,10 +296,7 @@ def initGameObjects():
     borders = []
     balls = []
 
-
-    #creating borders around pool table so the balls can bounce
-    
-    
+    #creating borders around pool table so the balls can bounce 
     #top 2
     borders.append(Border((60, 0), (table_width / 2 - 35, 0), 25))
     borders.append(Border((table_width / 2 + 37, 0), (table_width - 60, 0), 25))
@@ -356,14 +309,11 @@ def initGameObjects():
     borders.append(Border((0, 60), (0, table_height - 60), 28))
     borders.append(Border((table_width, 60), (table_width, table_height - 60), 28))
 
-
     #creating the pool balls    
-
     #cue ball
     balls.append(Ball((table_width / 4, table_height / 2), (255, 255, 255), 0, (0, 0)))
 
     #other balls
-
     #temp width
     tw = table_width / 1.5
     #temp height
@@ -375,7 +325,6 @@ def initGameObjects():
     #front most ball
     balls.append(Ball((tw, th), yellow, 1))
     #balls.append(Ball((table_width - 50, table_height - 50), (230, 230, 0), 1))
-
 
     #top diagonal
     balls.append(Ball((tw + spacer_x, th - spacer_y), blue, 2))
@@ -403,14 +352,11 @@ def initGameObjects():
     balls.append(Ball((tw + spacer_x*4.3, th), brown, 15))
 
     #collision ball_border_handlers
-
     #for balls and borders
     ball_border_handlers = [space.add_collision_handler(16, i) for i in range(16)]
 
-    #creating the cue
+    #Cue object
     cue = Cue()
-
-
 
 #for displaying thigns like score, cue, force bar
 def displayGraphics():
@@ -429,18 +375,14 @@ def displayGraphics():
     moves_txt = font2.render("Moves: " + str(moves), 5, (0, 138, 230))
     screen.blit(moves_txt, (width - 280, height - 40))
 
-
-
     #displaying the balls remaining at the bottom
     i = 1
-
     for ball in balls:
         if ball.ballNum != 0:
             ball.draw(True, 20 + i, height - 40, 15)
             i += 35
 
             pass
-
 
     #drawing balls, appying friction, and checking for a score
     #applying friction to balls so they dont infinitely move
@@ -449,7 +391,6 @@ def displayGraphics():
             ball.applyFriction() 
             ball.checkPut()
 
-    
     #power bar
 
     #label
@@ -460,7 +401,6 @@ def displayGraphics():
     pygame.draw.rect(screen, (0, 230, 0), (table_width + 10, 30, 35, table_height - 40))
 
     #grey top rect
-
     #dist of cue used as height of bar
     max_bar_height = (table_height - 40) + 30
 
@@ -471,13 +411,10 @@ def displayGraphics():
 
     #outline rect
     pygame.draw.rect(screen, (255, 0, 0), (table_width + 10, 30, 35, table_height - 40), 1)
-    
-    
-    #draw que only when true (On top)
+      
+    #draw que only when drawCue is true
     if drawCue:
         cue.draw()
-
-
 
 def main():
     global space, screen, width, height, balls, borders, table_width, table_height, drawCue, bg
@@ -505,7 +442,6 @@ def main():
     #calling initGameObjects method
     initGameObjects()
 
-
     #main gameloop
     while True:
         for event in pygame.event.get():
@@ -531,7 +467,6 @@ def main():
                     #calling release function
                     cue.release()
 
-
             #resets pool table when 'r' is clicked on keyboard
             if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
                 #first clearing pymunk space
@@ -545,15 +480,14 @@ def main():
                 initGameObjects()                    
 
         #calling graphics methods
-        displayGraphics() 
-       
+        displayGraphics()      
 
         #space.debug_draw(DrawOptions(screen))
 
         space.step(1/40)
+        clock.tick(120)
 
         pygame.display.update()
-        clock.tick(120)
 
 
 #static varibles meant to be accesed by all classes and funcs
@@ -563,7 +497,6 @@ font1 = pygame.font.SysFont('comicsansms', 12, True)
 font2 = pygame.font.SysFont('comicsansms', 25, False, True)
 font3 = pygame.font.SysFont('comicsansms', 50, False, True)
 
-
 #colors
 yellow = (244, 208, 63)
 brown = (100, 31, 22)
@@ -572,19 +505,9 @@ blue = (53, 152, 219)
 red = (204, 67, 54)
 green = (28, 125, 70)
 orange = (230, 126, 33)
-
 bg_color = (200, 200, 200)
 
 #bounce_sound = pygame.mixer.Sound('assets/bounce_sound.wav')
 
 if __name__ == '__main__':
    main()
-
-
-
-
-
-
-
-
-
