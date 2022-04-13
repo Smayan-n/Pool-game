@@ -245,7 +245,6 @@ class Cue():
         
         pygame.draw.line(screen, (255, 255, 255), (cueBall_x, cueBall_y), (end_x_gl, end_y_gl), 2)
         
-
         #using distance of cue to determine the force
         #doing it here because the power bar needs force to be constantly updated
         self.force = int(dist) * 60   
